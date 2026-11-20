@@ -1,0 +1,7 @@
+aws_region        = "us-west-2"
+domain            = "stratus.example.com"
+alert_email       = "REPLACE_WITH_YOUR_ALERT_EMAIL"
+app_secret_arn    = "REPLACE_WITH_BOOTSTRAP_OUTPUT"
+openai_secret_arn = "REPLACE_WITH_BOOTSTRAP_OUTPUT"
+worker_image      = "REPLACE_WITH_ECR_IMAGE_AT_SHA256_DIGEST"
+hosted_zone_id    = ""

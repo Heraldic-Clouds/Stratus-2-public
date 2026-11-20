@@ -1,0 +1,12 @@
+{
+  "name": "heraldic-clouds/stratus2-ai",
+  "description": "Stratus-2 Nextcloud organizer",
+  "license": "AGPL-3.0-or-later",
+  "require": {
+    "php": ">=8.4",
+    "aws/aws-sdk-php": "~3.398.3",
+    "stripe/stripe-php": "~22.0.0"
+  },
+  "autoload": {"psr-4": {"OCA\\Stratus2AI\\": "lib/"}},
+  "config": {"sort-packages": true, "allow-plugins": false, "prepend-autoloader": false}
+}

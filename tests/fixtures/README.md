@@ -1,0 +1,1 @@
+`nextcloud-info.xsd` is the official Nextcloud app metadata schema retrieved from https://apps.nextcloud.com/schema/apps/info.xsd on October 15, 2026. Its original copyright and AGPL-3.0-or-later license header are preserved. Keep this fixture pinned and update it deliberately with Nextcloud compatibility changes.

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+  <id>stratus_transfer</id>
+  <name>StratusTransfer</name>
+  <summary>Permission-checked direct Storj downloads</summary>
+  <description>Resumable browser downloads with short-lived URLs. Uploads retain Nextcloud's supported write lifecycle.</description>
+  <version>0.1.0</version>
+  <licence>agpl</licence>
+  <author>Heraldic Clouds</author>
+  <namespace>StratusTransfer</namespace>
+  <category>files</category>
+  <bugs>https://github.com/Heraldic-Clouds/Stratus-2-public/issues</bugs>
+  <dependencies><php min-version="8.4"/><nextcloud min-version="35" max-version="35"/></dependencies>
+  <commands><command>OCA\StratusTransfer\Command\Smoke</command></commands>
+  <navigations><navigation><name>Transfers</name><route>stratus_transfer.page.index</route><icon>app.svg</icon><order>21</order></navigation></navigations>
+</info>

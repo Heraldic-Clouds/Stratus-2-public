@@ -1,0 +1,38 @@
+services:
+  moto:
+    image: motoserver/moto:5.2.4@sha256:120b1589c6df7e35d2092935f6ff724486bb2c4189d0e36ce795baba1400ffd2
+    healthcheck: {test: [CMD, python, -c, 'import urllib.request; urllib.request.urlopen("http://localhost:5000/")'], interval: 3s, timeout: 3s, retries: 30}
+  bucket-init:
+    image: motoserver/moto:5.2.4@sha256:120b1589c6df7e35d2092935f6ff724486bb2c4189d0e36ce795baba1400ffd2
+    entrypoint: [python, -c]
+    command: ['import boto3; boto3.client("s3", endpoint_url="http://moto:5000", region_name="us-east-1", aws_access_key_id="ci-only", aws_secret_access_key="ci-only").create_bucket(Bucket="stratus2-ci")']
+    depends_on: {moto: {condition: service_healthy}}
+  postgres:
+    image: postgres:17.6-bookworm
+    environment: {POSTGRES_DB: nextcloud, POSTGRES_USER: nextcloud, POSTGRES_PASSWORD: '${TEST_DB_PASSWORD:?}'}
+    healthcheck: {test: [CMD-SHELL, 'pg_isready -U nextcloud'], interval: 3s, timeout: 3s, retries: 30}
+  redis:
+    image: redis:7.4.5-bookworm
+    command: [redis-server, --requirepass, '${TEST_DB_PASSWORD:?}', --save, '', --appendonly, 'no']
+  nextcloud:
+    build: {context: ., dockerfile: nextcloud/Dockerfile}
+    ports: ['127.0.0.1:8080:80']
+    environment:
+      STRATUS2_TEST_MODE: '1'
+      STRATUS2_TRANSFER_TEST_MODE: '1'
+      STRATUS2_HEALTH_HOST: localhost
+      STORJ_ENDPOINT: http://moto:5000
+      STORJ_BUCKET: stratus2-ci
+      STORJ_ACCESS_KEY: ci-only
+      STORJ_SECRET_KEY: ci-only
+      NEXTCLOUD_ADMIN_USER: ci_admin
+      NEXTCLOUD_ADMIN_PASSWORD: '${TEST_ADMIN_PASSWORD:?}'
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: '${TEST_DB_PASSWORD:?}'
+      REDIS_HOST: redis
+      REDIS_HOST_PASSWORD: '${TEST_DB_PASSWORD:?}'
+      REDIS_PASSWORD: '${TEST_DB_PASSWORD:?}'
+      WORKER_HMAC_SECRET: '${TEST_ADMIN_PASSWORD:?}'
+    depends_on: {postgres: {condition: service_healthy}, redis: {condition: service_started}, bucket-init: {condition: service_completed_successfully}}

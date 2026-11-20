@@ -1,0 +1,151 @@
+name: Validate and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        type: string
+        required: false
+        default: ''
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false, ref: '${{ inputs.checkout_ref || github.sha }}'}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: {python-version: '3.12'}
+      - run: pip install -r requirements-dev.lock
+      - name: Detect committed credentials
+        run: python scripts/check_secrets.py
+      - name: Python checks and security tests
+        run: |
+          bash -n nextcloud/slot-entrypoint.sh nextcloud/before-starting.sh
+          ruff check worker scripts tests
+          pytest -q
+          node --test tests/js/*.test.mjs
+      - name: Verify Amazon Linux host dependencies
+        run: |
+          sed '/^DATA_ID=/,$d' infra/runtime/cloud-init.sh.tftpl > /tmp/stratus2-runtime-dependencies.sh
+          docker run --rm --volume /tmp/stratus2-runtime-dependencies.sh:/check-runtime.sh:ro --volume "$PWD":/workspace:ro --env PYTHONPATH=/workspace/scripts --env PYTHONDONTWRITEBYTECODE=1 public.ecr.aws/amazonlinux/amazonlinux:2023 /bin/bash -ec '
+            bash /check-runtime.sh
+            /opt/stratus2-venv/bin/python -c "import boto3, yaml, datetime, host_deploy, backup; assert boto3.__version__ == '\''1.43.114'\''; assert datetime.UTC"
+          '
+      - uses: shivammathur/setup-php@d52fc211a0436f8839a587b3b5b8efddab4744ea # v2
+        with: {php-version: '8.4', extensions: 'curl, mbstring, xml, zip', coverage: none}
+      - name: Check PHP and dependency lock
+        run: |
+          find apps -name '*.php' -not -path '*/vendor/*' -print0 | xargs -0 -n1 php -l
+          composer validate --strict --working-dir=apps/stratus2_ai
+          composer install --working-dir=apps/stratus2_ai --no-dev --no-interaction --no-progress --prefer-dist --no-scripts
+          php tests/php/domain.php
+          php tests/php/photo-batch-plan.php
+          php tests/php/transfer.php
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: {terraform-version: '1.16.6', terraform_wrapper: false}
+      - name: Validate Terraform without accessing AWS
+        run: |
+          terraform fmt -check -recursive infra
+          terraform -chdir=infra/bootstrap init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/bootstrap validate
+          terraform -chdir=infra/runtime init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/runtime validate
+          terraform -chdir=infra/staging init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/staging validate
+  worker-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false, ref: '${{ inputs.checkout_ref || github.sha }}'}
+      - name: Build and import the real Lambda image
+        run: |
+          docker build --file worker/Dockerfile --tag stratus2-worker:test .
+          docker run --rm --entrypoint python stratus2-worker:test -c 'from worker.handler import handler; from worker.enhancement import handler as photo; assert handler({"Records": []}, None) == photo({"Records": []}, None) == {"batchItemFailures": []}'
+  photo-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false, ref: '${{ inputs.checkout_ref || github.sha }}'}
+      - run: npm install -g pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: node tests/browser/photo-ui.mjs
+  nextcloud:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false, ref: '${{ inputs.checkout_ref || github.sha }}'}
+      - name: Generate isolated test credentials
+        run: |
+          for name in TEST_DB_PASSWORD TEST_ADMIN_PASSWORD; do
+            value=$(openssl rand -hex 32)
+            printf '::add-mask::%s\n' "$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done
+      - name: Build and start a real Nextcloud installation
+        run: |
+          docker compose -f compose.test.yaml up -d --build
+          for attempt in $(seq 1 120); do
+            state=$(docker inspect --format '{{.State.Status}}' "$(docker compose -f compose.test.yaml ps --all --quiet nextcloud)")
+            if [ "$state" = exited ] || [ "$state" = dead ]; then exit 1; fi
+            if curl --fail --silent http://localhost:8080/status.php | python3 -c 'import json,sys; assert json.load(sys.stdin)["installed"]'; then exit 0; fi
+            sleep 5
+          done
+          exit 1
+      - name: Check internal health probes and reject untrusted application hosts
+        run: |
+          curl --fail --silent --header 'Host: 10.42.0.123:30080' http://localhost:8080/status.php | python3 -c 'import json,sys; assert json.load(sys.stdin)["installed"]'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --header 'Host: untrusted.example' http://localhost:8080/index.php/login)" = 400
+      - name: Check crawler rules and public sign-in indexing
+        run: |
+          curl --fail --silent http://localhost:8080/robots.txt | grep -Fx 'Allow: /'
+          curl --fail --silent http://localhost:8080/robots.txt | grep -Fx 'Disallow: /apps/'
+          curl --fail --silent http://localhost:8080/robots.txt | grep -Fx 'Allow: /index.php/apps/stratus2_ai/auth'
+          ! curl --silent --show-error --dump-header - --output /dev/null http://localhost:8080/index.php/apps/stratus2_ai/auth | grep -Eiq '^X-Robots-Tag:.*(noindex|nofollow)'
+      - name: Check the logout adapter ignores provider return URLs
+        run: |
+          curl --fail --silent --show-error --output /dev/null --write-out '%{redirect_url}' 'http://localhost:8080/index.php/apps/stratus2_ai/auth/logout?post_logout_redirect_uri=https%3A%2F%2Funtrusted.example%2F&client_id=fixture' | python3 -c 'import sys; from urllib.parse import urlsplit,parse_qs; target=urlsplit(sys.stdin.read()); assert target.netloc=="localhost:8080" and target.path in ("/apps/stratus2_ai/auth","/index.php/apps/stratus2_ai/auth") and parse_qs(target.query)=={"mode":["logout"]}'
+      - name: Exercise organization and undo with real Nextcloud files
+        run: |
+          docker compose -f compose.test.yaml exec -T --user www-data nextcloud php -r '
+            require "3rdparty/autoload.php";
+            new \Aws\S3\S3Client(["version"=>"2006-03-01","region"=>"us-west-2","credentials"=>false]);
+            class_exists(\Aws\Api\StructureShape::class);
+            require "occ";
+          ' -- stratus2:smoke
+          docker compose -f compose.test.yaml exec -T --user www-data nextcloud php occ stratus-transfer:smoke
+      - name: Exercise concurrent transfer accounting in independent PHP processes
+        run: |
+          docker compose -f compose.test.yaml cp tests/php/transfer-concurrency.php nextcloud:/tmp/transfer-concurrency.php
+          docker compose -f compose.test.yaml exec -T --user www-data nextcloud php /tmp/transfer-concurrency.php
+      - name: Exercise paid photo improvements with real Nextcloud files and isolated Stripe transport
+        run: |
+          docker compose -f compose.test.yaml cp tests/php/photo-integration.php nextcloud:/tmp/photo-integration.php
+          docker compose -f compose.test.yaml exec -T --user www-data nextcloud php /tmp/photo-integration.php
+          docker compose -f compose.test.yaml cp tests/php/photo-batch-integration.php nextcloud:/tmp/photo-batch-integration.php
+          docker compose -f compose.test.yaml exec -T --user www-data nextcloud php /tmp/photo-batch-integration.php
+          docker compose -f compose.test.yaml cp tests/php/staging-subscription-integration.php nextcloud:/tmp/staging-subscription-integration.php
+          docker compose -f compose.test.yaml exec -T --user www-data nextcloud php /tmp/staging-subscription-integration.php
+      - name: Verify a PostgreSQL backup restores into a clean database
+        run: |
+          docker compose -f compose.test.yaml exec -T postgres pg_dump -U nextcloud -d nextcloud -Fc > /tmp/stratus2.dump
+          docker compose -f compose.test.yaml exec -T postgres createdb -U nextcloud restore_check
+          docker compose -f compose.test.yaml exec -T postgres pg_restore -U nextcloud -d restore_check --exit-on-error < /tmp/stratus2.dump
+          docker compose -f compose.test.yaml exec -T postgres psql -U nextcloud -d restore_check -c 'SELECT COUNT(*) FROM oc_stratus2_jobs;'
+      - name: Stop isolated containers
+        if: always()
+        run: |
+          if [ "${{ job.status }}" != success ]; then docker compose -f compose.test.yaml logs --no-color --tail=120 nextcloud; fi
+          docker compose -f compose.test.yaml down --volumes

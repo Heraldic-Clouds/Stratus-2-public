@@ -1,0 +1,25 @@
+#stratus2-organizer,#stratus2-auth{box-sizing:border-box;max-width:1100px;width:100%;margin:0 auto;padding:48px 36px 80px;color:var(--color-main-text,#18324b)}#stratus2-auth{max-width:520px;padding:36px 24px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.22em;color:#358b9b}#stratus2-organizer h1,#stratus2-auth h1{font-size:clamp(28px,4vw,44px);line-height:1.15;margin:14px 0 18px;font-weight:650}#stratus2-organizer header p{font-size:18px;max-width:620px;margin-bottom:34px}#stratus2-organizer form,#stratus2-auth form{display:flex;flex-direction:column;gap:12px}#stratus2-organizer label,#stratus2-auth label{font-weight:600;margin-top:10px}#stratus2-organizer input:not([type=checkbox]),#stratus2-auth input,#stratus2-organizer textarea{width:100%;box-sizing:border-box;border:1px solid var(--color-border,#bcced4);border-radius:10px;padding:12px;background:var(--color-main-background,#fff);font:inherit}#stratus2-organizer textarea{line-height:1.6;resize:vertical}.folder-row{display:flex;gap:10px}.folder-row input{flex:1}.consent{display:flex;gap:12px;align-items:flex-start;line-height:1.6}.cost-note{padding:14px;background:var(--color-background-dark,#eef6f7);border-radius:10px}#stratus2-organizer button,#stratus2-auth button{min-height:44px;padding:10px 18px;border-radius:9px;cursor:pointer}#stratus2-organizer .primary,#stratus2-auth .primary{background:#126b7a;color:#fff;border-color:#126b7a}#stratus2-organizer button:disabled{opacity:.45;cursor:default}#job-section, #stratus2-organizer section{margin-top:38px}#stratus2-organizer h2{font-size:23px;margin-bottom:14px}#progress{width:100%;margin:14px 0}.table-scroll{overflow-x:auto}#stratus2-organizer table{width:100%;border-collapse:collapse}#stratus2-organizer td,#stratus2-organizer th{padding:13px 10px;text-align:left;border-bottom:1px solid var(--color-border,#dce6ea);overflow-wrap:anywhere;min-width:160px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}#notice,#auth-notice{margin:18px 0;color:var(--color-error,#a23b3b)}#stratus2-organizer footer{margin-top:44px;padding-top:24px;border-top:1px solid var(--color-border,#dce6ea)}@media(max-width:600px){#stratus2-organizer{padding:28px 16px}.folder-row{flex-direction:column}}
+#stratus2-auth [hidden]{display:none!important}
+#stratus2-auth{max-width:1100px;padding:36px 32px 60px}
+#stratus2-auth .auth-layout{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(28px,5vw,64px);align-items:start}
+#stratus2-auth .auth-summary{grid-column:2;grid-row:1;min-width:0}
+#stratus2-auth .auth-access{grid-column:1;grid-row:1;min-width:0}
+#stratus2-auth .auth-summary h2{font-size:clamp(22px,2.5vw,30px);line-height:1.2;margin:0 0 18px}
+#stratus2-auth .auth-summary p{font-size:16px;line-height:1.65;margin:0 0 14px;max-width:55ch}
+#stratus2-auth .auth-access>p:first-child{margin:0 0 20px}
+#stratus2-auth .auth-details{margin-top:32px;padding-top:22px;border-top:1px solid var(--color-border,#dce6ea)}
+#stratus2-auth .auth-details ul{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 28px;margin:0;padding-left:22px}
+#stratus2-auth .auth-details li{line-height:1.6;padding-left:3px;overflow-wrap:anywhere}
+#stratus2-auth a{overflow-wrap:anywhere}
+@media(max-width:700px){#stratus2-auth{padding:28px 18px 48px}#stratus2-auth .auth-layout{grid-template-columns:minmax(0,1fr);gap:24px}#stratus2-auth .auth-summary,#stratus2-auth .auth-access{grid-column:1;grid-row:auto}#stratus2-auth .auth-details ul{grid-template-columns:minmax(0,1fr);gap:10px}}
+/* Nextcloud clips its fixed app container; scroll the organizer within it. */
+#stratus2-organizer{height:100%;overflow-y:auto}
+#stratus2-organizer [hidden]{display:none!important}
+#stratus2-organizer nav{margin-bottom:24px}
+#stratus2-organizer button[aria-pressed=true]{border-color:#126b7a;background:#126b7a;color:#fff}
+.photo-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:20px}
+.photo-comparison figure{margin:0;min-width:0}
+.photo-comparison img{display:block;width:100%;height:380px;object-fit:contain;background:var(--color-background-dark,#eef6f7);border-radius:12px}
+.photo-comparison figcaption{padding-top:8px;text-align:center}
+#stratus2-organizer #storage-blocks{max-width:160px}
+@media(max-width:600px){.photo-comparison{grid-template-columns:1fr}.photo-comparison img{height:280px}}

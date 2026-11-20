@@ -1,0 +1,7 @@
+aws_region        = "us-west-2"
+domain            = "staging.example.com"
+hosted_zone_id    = "REPLACE_WITH_EXISTING_ZONE_ID"
+state_bucket      = "REPLACE_WITH_EXISTING_STATE_BUCKET"
+openai_secret_arn = "arn:aws:secretsmanager:us-west-2:123456789012:secret:stratus2/openai-REPLACE"
+allowed_cidrs     = ["192.0.2.1/32"] # Replace with actual tester IPs.
+worker_image      = "123456789012.dkr.ecr.us-west-2.amazonaws.com/stratus2-staging-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000"

@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /apps/
+Disallow: /index.php/apps/
+Disallow: /remote.php/
+Disallow: /index.php/remote.php/
+Disallow: /ocs/
+Disallow: /index.php/ocs/
+Disallow: /ocs-provider/
+Disallow: /settings/
+Disallow: /index.php/settings/
+Allow: /apps/stratus2_ai/auth
+Allow: /index.php/apps/stratus2_ai/auth

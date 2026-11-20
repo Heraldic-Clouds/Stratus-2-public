@@ -1,0 +1,58 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+dnf install -y python3.12 python3.12-pip tar gzip jq
+python3.12 -m venv /opt/stratus2-venv
+/opt/stratus2-venv/bin/pip install 'boto3==1.43.114' 'PyYAML==6.0.3'
+DATA_ID='${data_volume_id}'
+DEVICE="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$${DATA_ID//-/}"
+for attempt in $(seq 1 180); do
+  if [ -b "$DEVICE" ]; then break; fi
+  sleep 5
+done
+test -b "$DEVICE"
+if ! blkid "$DEVICE" >/dev/null; then mkfs.ext4 "$DEVICE"; fi
+mkdir -p /var/lib/rancher
+UUID=$(blkid -s UUID -o value "$DEVICE")
+grep -q "$UUID" /etc/fstab || printf 'UUID=%s /var/lib/rancher ext4 defaults 0 2\n' "$UUID" >> /etc/fstab
+mount /var/lib/rancher
+curl --fail --silent --show-error --location 'https://github.com/k3s-io/k3s/releases/download/${k3s_version}/k3s' -o /usr/local/bin/k3s
+curl --fail --silent --show-error --location 'https://github.com/k3s-io/k3s/releases/download/${k3s_version}/sha256sum-amd64.txt' -o /tmp/k3s-sha256.txt
+(cd /usr/local/bin; grep ' k3s$' /tmp/k3s-sha256.txt | sha256sum --check --status)
+chmod 0755 /usr/local/bin/k3s
+ln -sf /usr/local/bin/k3s /usr/local/bin/kubectl
+mkdir -p /etc/rancher/k3s /opt/stratus2
+cat > /etc/rancher/k3s/config.yaml <<'CONFIG'
+node-name: stratus2-single
+disable:
+  - traefik
+  - servicelb
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+cluster-cidr: 10.52.0.0/16
+service-cidr: 10.53.0.0/16
+CONFIG
+cat > /etc/systemd/system/k3s.service <<'UNIT'
+[Unit]
+Description=Stratus-2 K3s
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/var/lib/rancher
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/k3s server
+Restart=always
+RestartSec=5
+Delegate=yes
+KillMode=process
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now k3s
+systemctl enable --now amazon-ssm-agent
+printf 'AWS_REGION=${region}\nAWS_DEFAULT_REGION=${region}\n' > /etc/stratus2.env

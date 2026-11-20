@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.png binary
+# Generated SDK template literals contain significant trailing whitespace.
+apps/stratus2_ai/js/auth.js whitespace=-blank-at-eol
